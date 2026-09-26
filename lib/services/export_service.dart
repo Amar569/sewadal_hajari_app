@@ -49,8 +49,9 @@ class ExportService {
     final splitIndex = (rows.length / 2).ceil();
     final leftRows = rows.sublist(0, splitIndex);
     final rightRows = rows.sublist(splitIndex);
-    final maxLen =
-        leftRows.length > rightRows.length ? leftRows.length : rightRows.length;
+    final maxLen = leftRows.length > rightRows.length
+        ? leftRows.length
+        : rightRows.length;
 
     List<String> rowData(ExportRow? r) {
       if (r == null) return ['', '', '', '', ''];
@@ -87,8 +88,8 @@ class ExportService {
     doc.addPage(
       pw.MultiPage(
         pageTheme: pw.PageTheme(
-          pageFormat: PdfPageFormat.a4.landscape,
-          margin: const pw.EdgeInsets.all(20),
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(16),
           // Force an opaque white page background. Without this, the PDF
           // page is transparent, and when rasterized to PNG for sharing,
           // viewers that don't support transparency (e.g. WhatsApp) render
@@ -110,82 +111,85 @@ class ExportService {
             children: [
               pw.Text(
                 'WEEKLY SATSANG ATTENDANCE CHART - ${category.toUpperCase()}',
-                style:
-                    pw.TextStyle(fontSize: 17, fontWeight: pw.FontWeight.bold),
+                style: pw.TextStyle(
+                    fontSize: 14, fontWeight: pw.FontWeight.bold),
               ),
-              pw.SizedBox(height: 4),
+              pw.SizedBox(height: 3),
               pw.Text('IIT SURYA NAGAR - UNIT NO. 1740',
-                  style: const pw.TextStyle(fontSize: 12)),
-              pw.SizedBox(height: 8),
+                  style: const pw.TextStyle(fontSize: 10)),
+              pw.SizedBox(height: 6),
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
-                  pw.Text('DAY: $day', style: const pw.TextStyle(fontSize: 11)),
+                  pw.Text('DAY: $day', style: const pw.TextStyle(fontSize: 9)),
                   pw.Text('DATE: $date',
-                      style: const pw.TextStyle(fontSize: 11)),
+                      style: const pw.TextStyle(fontSize: 9)),
                 ],
               ),
-              pw.SizedBox(height: 12),
+              pw.SizedBox(height: 8),
             ],
           );
         },
-        footer: (context) => pw.Padding(
-          padding: const pw.EdgeInsets.only(top: 16),
-          child: pw.Row(
-            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-            children: [
-              pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  pw.Text('SANCHALAK', style: const pw.TextStyle(fontSize: 10)),
-                  pw.Text(sanchalakName,
-                      style: pw.TextStyle(
-                          fontSize: 10, fontWeight: pw.FontWeight.bold)),
-                  pw.Text('SIGN: ____________',
-                      style: const pw.TextStyle(fontSize: 10)),
-                ],
-              ),
-              pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  pw.Text('SHIKSHAK', style: const pw.TextStyle(fontSize: 10)),
-                  pw.Text(shikshakName,
-                      style: pw.TextStyle(
-                          fontSize: 10, fontWeight: pw.FontWeight.bold)),
-                  pw.Text('SIGN: ____________',
-                      style: const pw.TextStyle(fontSize: 10)),
-                ],
-              ),
-            ],
-          ),
-        ),
+        // NOTE: no `footer:` here on purpose. MultiPage's footer is pinned
+        // to the bottom of every page, which left a large empty gap between
+        // the table and the signature block whenever the table didn't fill
+        // the page. Instead, the signature block is now the last item in
+        // `build:` below, so it sits immediately after the table content.
         build: (context) => [
           pw.TableHelper.fromTextArray(
             headers: headers,
             data: data,
             headerStyle:
-                pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9),
+                pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6.5),
             headerDecoration: const pw.BoxDecoration(color: PdfColors.grey300),
             headerPadding:
-                const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 6),
-            cellStyle: const pw.TextStyle(fontSize: 8.5),
+                const pw.EdgeInsets.symmetric(horizontal: 3, vertical: 3),
+            cellStyle: const pw.TextStyle(fontSize: 6),
             cellPadding:
-                const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 5),
+                const pw.EdgeInsets.symmetric(horizontal: 3, vertical: 2.5),
             cellAlignment: pw.Alignment.centerLeft,
             border: pw.TableBorder.all(color: PdfColors.grey600, width: 0.4),
             // Narrower Pre/Ab and PV/CV Time columns; extra space given to Name.
             columnWidths: {
-              0: const pw.FlexColumnWidth(0.4), // Sr.No
-              1: const pw.FlexColumnWidth(2.6), // Name  (wider)
-              2: const pw.FlexColumnWidth(1.1), // Per.No
-              3: const pw.FlexColumnWidth(0.55), // Pre/Ab (narrower)
-              4: const pw.FlexColumnWidth(0.85), // PV/CV Time (narrower)
-              5: const pw.FlexColumnWidth(0.4),
-              6: const pw.FlexColumnWidth(2.6),
-              7: const pw.FlexColumnWidth(1.1),
+              0: const pw.FlexColumnWidth(0.5), // Sr.No
+              1: const pw.FlexColumnWidth(2.0), // Name
+              2: const pw.FlexColumnWidth(1.0), // Per.No
+              3: const pw.FlexColumnWidth(0.55), // Pre/Ab
+              4: const pw.FlexColumnWidth(0.85), // PV/CV Time
+              5: const pw.FlexColumnWidth(0.5),
+              6: const pw.FlexColumnWidth(2.0),
+              7: const pw.FlexColumnWidth(1.0),
               8: const pw.FlexColumnWidth(0.55),
               9: const pw.FlexColumnWidth(0.85),
             },
+          ),
+          pw.SizedBox(height: 24),
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text('SANCHALAK', style: const pw.TextStyle(fontSize: 8)),
+                  pw.Text(sanchalakName,
+                      style: pw.TextStyle(
+                          fontSize: 8, fontWeight: pw.FontWeight.bold)),
+                  pw.Text('SIGN: ____________',
+                      style: const pw.TextStyle(fontSize: 8)),
+                ],
+              ),
+              pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text('SHIKSHAK', style: const pw.TextStyle(fontSize: 8)),
+                  pw.Text(shikshakName,
+                      style: pw.TextStyle(
+                          fontSize: 8, fontWeight: pw.FontWeight.bold)),
+                  pw.Text('SIGN: ____________',
+                      style: const pw.TextStyle(fontSize: 8)),
+                ],
+              ),
+            ],
           ),
         ],
       ),
@@ -249,13 +253,7 @@ class ExportService {
 
     // Rasterize at a high DPI so the exported chart stays sharp/readable.
     final rasterPages = await Printing.raster(pdfBytes, dpi: 220).toList();
-
-    final Uint8List pngBytes;
-    if (rasterPages.length == 1) {
-      pngBytes = await rasterPages.first.toPng();
-    } else {
-      pngBytes = await _stitchPagesVertically(rasterPages);
-    }
+    final pngBytes = await _composePng(rasterPages);
 
     final dir = await exportsDir();
     final fileName = 'Hajari_${category}_${_fileSafeDate(date)}.png';
@@ -264,11 +262,36 @@ class ExportService {
     return file;
   }
 
-  /// Decodes each rasterized PDF page's raw pixels into a ui.Image, then
-  /// draws them one below another onto a single canvas, producing one
-  /// tall composite PNG containing every page's content.
-  static Future<Uint8List> _stitchPagesVertically(
-      List<PdfRaster> rasterPages) async {
+  /// Scans a rasterized page from the bottom up and returns the y-coordinate
+  /// of the lowest non-white pixel row (i.e. where real content ends).
+  /// Used to crop away the blank space left below the content on a fixed
+  /// A4-height page.
+  static int _findContentBottom(PdfRaster raster) {
+    final pixels = raster.pixels; // raw RGBA bytes
+    final width = raster.width;
+    final height = raster.height;
+    const whiteThreshold = 250; // treat near-white as blank
+
+    for (int y = height - 1; y >= 0; y--) {
+      final rowStart = y * width * 4;
+      for (int x = 0; x < width; x++) {
+        final i = rowStart + x * 4;
+        if (pixels[i] < whiteThreshold ||
+            pixels[i + 1] < whiteThreshold ||
+            pixels[i + 2] < whiteThreshold) {
+          return y;
+        }
+      }
+    }
+    return height - 1;
+  }
+
+  /// Decodes each rasterized PDF page into a ui.Image, trims the blank
+  /// space below the content on the last page (where the fixed A4 page
+  /// height otherwise leaves a large empty gap under the signature row),
+  /// and draws every page's content onto one composite canvas - stacked
+  /// vertically if there's more than one page.
+  static Future<Uint8List> _composePng(List<PdfRaster> rasterPages) async {
     Future<ui.Image> decode(PdfRaster raster) {
       final completer = Completer<ui.Image>();
       ui.decodeImageFromPixels(
@@ -286,28 +309,51 @@ class ExportService {
       images.add(await decode(raster));
     }
 
+    // Only the LAST page needs bottom-trimming - earlier pages (if the
+    // list spans multiple pages) are filled with table rows and don't
+    // have trailing blank space.
+    const bottomPadding = 24; // small breathing room below the content
+    final lastRaster = rasterPages.last;
+    final contentBottom = _findContentBottom(lastRaster);
+    final trimmedLastHeight =
+        (contentBottom + bottomPadding).clamp(1, images.last.height);
+
     final width =
         images.map((img) => img.width).reduce((a, b) => a > b ? a : b);
-    final totalHeight = images.fold<int>(0, (sum, img) => sum + img.height);
+    int totalHeight = 0;
+    for (var i = 0; i < images.length; i++) {
+      totalHeight +=
+          (i == images.length - 1) ? trimmedLastHeight : images[i].height;
+    }
 
     final recorder = ui.PictureRecorder();
     final canvas = ui.Canvas(recorder);
 
-    // White background behind the whole stitched image.
     canvas.drawRect(
       ui.Rect.fromLTWH(0, 0, width.toDouble(), totalHeight.toDouble()),
       ui.Paint()..color = const ui.Color(0xFFFFFFFF),
     );
 
     double yOffset = 0;
-    for (final img in images) {
-      canvas.drawImage(img, ui.Offset(0, yOffset), ui.Paint());
-      yOffset += img.height;
+    for (var i = 0; i < images.length; i++) {
+      final img = images[i];
+      final isLast = i == images.length - 1;
+      final drawHeight = isLast ? trimmedLastHeight : img.height;
+
+      canvas.drawImageRect(
+        img,
+        ui.Rect.fromLTWH(0, 0, img.width.toDouble(), drawHeight.toDouble()),
+        ui.Rect.fromLTWH(
+            0, yOffset, img.width.toDouble(), drawHeight.toDouble()),
+        ui.Paint(),
+      );
+      yOffset += drawHeight;
     }
 
     final picture = recorder.endRecording();
     final composite = await picture.toImage(width, totalHeight);
-    final byteData = await composite.toByteData(format: ui.ImageByteFormat.png);
+    final byteData =
+        await composite.toByteData(format: ui.ImageByteFormat.png);
     return byteData!.buffer.asUint8List();
   }
 
