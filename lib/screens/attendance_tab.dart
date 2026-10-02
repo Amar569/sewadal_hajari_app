@@ -490,13 +490,6 @@ class _AttendanceTabState extends State<AttendanceTab> {
                 ),
               ),
             ),
-            const SizedBox(width: 6),
-            _statusChip('P', status == 'Present', AppTheme.presentGreen,
-                () => setState(() => _status[m.id!] = 'Present')),
-            const SizedBox(width: 4),
-            _statusChip('A', status == 'Absent', AppTheme.absentRed,
-                () => setState(() => _status[m.id!] = 'Absent')),
-            const SizedBox(width: 6),
             GestureDetector(
               onTap: () => _openPvPicker(m),
               child: Container(
