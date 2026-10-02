@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'attendance_tab.dart';
 import 'exports_screen.dart';
 import '../theme/app_theme.dart';
+import '../services/export_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -27,6 +28,40 @@ class _HomeScreenState extends State<HomeScreen> {
       lastDate: DateTime(2100),
     );
     if (picked != null) setState(() => _selectedDate = picked);
+  }
+
+  Future<void> _editHeader() async {
+  final ctrl = TextEditingController(text: await ExportService.loadHeader());
+  if (!mounted) return;
+  final saved = await showDialog<String>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Report header'),
+      content: TextField(
+        controller: ctrl,
+        maxLength: 60,
+        textCapitalization: TextCapitalization.characters,
+        decoration: const InputDecoration(
+          hintText: 'e.g. SATSANG BHAWAN',
+          helperText: 'Shown at the top of every PDF, image and Excel file.\nLeave empty for no header.',
+          helperMaxLines: 2,
+        ),
+      ),
+      actions: [
+        TextButton(
+            onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+        TextButton(
+            onPressed: () => Navigator.pop(ctx, ctrl.text),
+            child: const Text('Save')),
+      ],
+    ),
+  );
+  if (saved == null) return;
+  await ExportService.saveHeader(saved);
+  if (!mounted) return;
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(content: Text('Header saved. It will appear in new exports.')),
+  );
   }
 
   @override
@@ -97,6 +132,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 context,
                 MaterialPageRoute(builder: (_) => const ExportsScreen()),
               ),
+            ),
+            IconButton(
+              tooltip: 'Edit report header',
+              icon: const Icon(Icons.title),
+              onPressed: _editHeader,
             ),
           ],
         ),
