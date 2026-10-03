@@ -12,7 +12,6 @@
 // import '../models/member.dart';
 // import '../models/attendance_record.dart';
 
-// /// One row combining a member with their attendance for the exported date.
 // class ExportRow {
 //   final Member member;
 //   final AttendanceRecord? record;
@@ -30,11 +29,27 @@
 //   }
 
 //   static String _fileSafeDate(String date) => date.replaceAll('/', '-');
+//   static Future<File> _headerFile() async {
+//     final base = await getApplicationDocumentsDirectory();
+//     return File('${base.path}/report_header.txt');
+//   }
 
-//   // ------------------------------------------------------------------
-//   // Shared PDF document builder - used by both exportPdf and exportPng,
-//   // so the PNG is always a pixel-accurate rasterization of the PDF.
-//   // ------------------------------------------------------------------
+//   /// Returns the saved header exactly as stored ('' if none).
+//   static Future<String> loadHeader() async {
+//     try {
+//       final f = await _headerFile();
+//       if (!await f.exists()) return '';
+//       return (await f.readAsString()).trim();
+//     } catch (_) {
+//       return '';
+//     }
+//   }
+
+//   static Future<void> saveHeader(String text) async {
+//     final f = await _headerFile();
+//     await f.writeAsString(text.trim());
+//   }
+
 //   static Future<Uint8List> _buildPdfBytes({
 //     required String category,
 //     required String day,
@@ -43,24 +58,79 @@
 //     required String sanchalakName,
 //     required String shikshakName,
 //   }) async {
+//     final headerText = (await loadHeader()).toUpperCase();
 //     final doc = pw.Document();
+//     _addChartPage(
+//       doc,
+//       headerText: headerText,
+//       category: category,
+//       day: day,
+//       date: date,
+//       rows: rows,
+//       sanchalakName: sanchalakName,
+//       shikshakName: shikshakName,
+//     );
+//     return doc.save();
+//   }
 
+//   static Future<Uint8List> _buildCombinedPdfBytes({
+//     required String day,
+//     required String date,
+//     required List<ExportRow> gentsRows,
+//     required List<ExportRow> ladiesRows,
+//     required String gentsSanchalakName,
+//     required String gentsShikshakName,
+//     required String ladiesSanchalakName,
+//     required String ladiesShikshakName,
+//   }) async {
+//     final headerText = (await loadHeader()).toUpperCase();
+//     final doc = pw.Document();
+//     _addChartPage(
+//       doc,
+//       headerText: headerText,
+//       category: 'Gents',
+//       day: day,
+//       date: date,
+//       rows: gentsRows,
+//       sanchalakName: gentsSanchalakName,
+//       shikshakName: gentsShikshakName,
+//     );
+//     _addChartPage(
+//       doc,
+//       headerText: headerText,
+//       category: 'Ladies',
+//       day: day,
+//       date: date,
+//       rows: ladiesRows,
+//       sanchalakName: ladiesSanchalakName,
+//       shikshakName: ladiesShikshakName,
+//     );
+//     return doc.save();
+//   }
+//   static void _addChartPage(
+//     pw.Document doc, {
+//     required String headerText,
+//     required String category,
+//     required String day,
+//     required String date,
+//     required List<ExportRow> rows,
+//     required String sanchalakName,
+//     required String shikshakName,
+//   }) {
 //     // Split members into two side-by-side blocks, like the printed chart.
 //     final splitIndex = (rows.length / 2).ceil();
 //     final leftRows = rows.sublist(0, splitIndex);
 //     final rightRows = rows.sublist(splitIndex);
-//     final maxLen = leftRows.length > rightRows.length
-//         ? leftRows.length
-//         : rightRows.length;
+//     final maxLen =
+//         leftRows.length > rightRows.length ? leftRows.length : rightRows.length;
 
 //     List<String> rowData(ExportRow? r) {
-//       if (r == null) return ['', '', '', '', ''];
+//       if (r == null) return ['', '', '', ''];
 //       final rec = r.record;
 //       return [
 //         r.member.srNo.toString(),
 //         r.member.name,
 //         '${r.member.perNo} ${r.member.snsdNo}'.trim(),
-//         rec?.status ?? '',
 //         rec?.pvTime ?? '',
 //       ];
 //     }
@@ -69,12 +139,10 @@
 //       'Sr.No',
 //       'Name',
 //       'Per.No',
-//       'Pre/Ab',
 //       'PV/CV Time',
 //       'Sr.No',
 //       'Name',
 //       'Per.No',
-//       'Pre/Ab',
 //       'PV/CV Time',
 //     ];
 
@@ -90,29 +158,36 @@
 //         pageTheme: pw.PageTheme(
 //           pageFormat: PdfPageFormat.a4,
 //           margin: const pw.EdgeInsets.all(16),
-//           // Force an opaque white page background. Without this, the PDF
-//           // page is transparent, and when rasterized to PNG for sharing,
-//           // viewers that don't support transparency (e.g. WhatsApp) render
-//           // it as solid black - making all the black text invisible.
 //           buildBackground: (context) => pw.FullPage(
 //             ignoreMargins: true,
 //             child: pw.Container(color: PdfColors.white),
 //           ),
 //         ),
 //         header: (context) {
-//           // Only show the full title/subtitle/day-date block on the first
-//           // page. Without this check, MultiPage calls header() on every
-//           // page, so the title would print again at the top of page 2+.
 //           if (context.pageNumber > 1) {
 //             return pw.SizedBox(height: 6);
 //           }
 //           return pw.Column(
 //             crossAxisAlignment: pw.CrossAxisAlignment.center,
 //             children: [
+//               // Custom header line - always uppercase and centered.
+//               if (headerText.isNotEmpty) ...[
+//                 pw.Container(
+//                   width: double.infinity,
+//                   alignment: pw.Alignment.center,
+//                   child: pw.Text(
+//                     headerText,
+//                     textAlign: pw.TextAlign.center,
+//                     style: pw.TextStyle(
+//                         fontSize: 16, fontWeight: pw.FontWeight.bold),
+//                   ),
+//                 ),
+//                 pw.SizedBox(height: 6),
+//               ],
 //               pw.Text(
 //                 'WEEKLY SATSANG ATTENDANCE CHART - ${category.toUpperCase()}',
-//                 style: pw.TextStyle(
-//                     fontSize: 14, fontWeight: pw.FontWeight.bold),
+//                 style:
+//                     pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
 //               ),
 //               pw.SizedBox(height: 3),
 //               pw.Text('IIT SURYA NAGAR - UNIT NO. 1740',
@@ -149,18 +224,15 @@
 //                 const pw.EdgeInsets.symmetric(horizontal: 3, vertical: 2.5),
 //             cellAlignment: pw.Alignment.centerLeft,
 //             border: pw.TableBorder.all(color: PdfColors.grey600, width: 0.4),
-//             // Narrower Pre/Ab and PV/CV Time columns; extra space given to Name.
 //             columnWidths: {
-//               0: const pw.FlexColumnWidth(0.5), // Sr.No
-//               1: const pw.FlexColumnWidth(2.0), // Name
+//               0: const pw.FlexColumnWidth(0.4), // Sr.No
+//               1: const pw.FlexColumnWidth(2.2), // Name
 //               2: const pw.FlexColumnWidth(1.0), // Per.No
-//               3: const pw.FlexColumnWidth(0.55), // Pre/Ab
-//               4: const pw.FlexColumnWidth(0.85), // PV/CV Time
-//               5: const pw.FlexColumnWidth(0.5),
-//               6: const pw.FlexColumnWidth(2.0),
-//               7: const pw.FlexColumnWidth(1.0),
-//               8: const pw.FlexColumnWidth(0.55),
-//               9: const pw.FlexColumnWidth(0.85),
+//               3: const pw.FlexColumnWidth(0.85), // PV/CV Time
+//               4: const pw.FlexColumnWidth(0.4),
+//               5: const pw.FlexColumnWidth(2.2),
+//               6: const pw.FlexColumnWidth(1.0),
+//               7: const pw.FlexColumnWidth(0.85),
 //             },
 //           ),
 //           pw.SizedBox(height: 24),
@@ -194,8 +266,6 @@
 //         ],
 //       ),
 //     );
-
-//     return doc.save();
 //   }
 
 //   // ------------------------------------------------------------------
@@ -352,8 +422,7 @@
 
 //     final picture = recorder.endRecording();
 //     final composite = await picture.toImage(width, totalHeight);
-//     final byteData =
-//         await composite.toByteData(format: ui.ImageByteFormat.png);
+//     final byteData = await composite.toByteData(format: ui.ImageByteFormat.png);
 //     return byteData!.buffer.asUint8List();
 //   }
 
@@ -374,6 +443,24 @@
 //       workbook.delete('Sheet1');
 //     }
 
+//     // Custom header: first row, uppercase, merged across the 4 table
+//     // columns (A-D) and centered.
+//     final headerText = (await loadHeader()).toUpperCase();
+//     if (headerText.isNotEmpty) {
+//       sheet.appendRow([xls.TextCellValue(headerText)]);
+//       sheet.merge(
+//         xls.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0),
+//         xls.CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: 0),
+//       );
+//       sheet
+//           .cell(xls.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0))
+//           .cellStyle = xls.CellStyle(
+//         bold: true,
+//         fontSize: 14,
+//         horizontalAlign: xls.HorizontalAlign.Center,
+//       );
+//     }
+
 //     sheet.appendRow([
 //       xls.TextCellValue(
 //           'WEEKLY SATSANG ATTENDANCE CHART - ${category.toUpperCase()}')
@@ -389,7 +476,6 @@
 //       xls.TextCellValue('Sr.No'),
 //       xls.TextCellValue('Name'),
 //       xls.TextCellValue('Per.No'),
-//       xls.TextCellValue('Pre/Ab'),
 //       xls.TextCellValue('PV/CV Time'),
 //     ]);
 
@@ -399,7 +485,6 @@
 //         xls.IntCellValue(r.member.srNo),
 //         xls.TextCellValue(r.member.name),
 //         xls.TextCellValue('${r.member.perNo} ${r.member.snsdNo}'.trim()),
-//         xls.TextCellValue(rec?.status ?? ''),
 //         xls.TextCellValue(rec?.pvTime ?? ''),
 //       ]);
 //     }
@@ -631,27 +716,24 @@ class ExportService {
           if (context.pageNumber > 1) {
             return pw.SizedBox(height: 6);
           }
+          // If a custom header has been set, it REPLACES the default
+          // "WEEKLY SATSANG ATTENDANCE CHART - CATEGORY" title entirely.
+          // With no custom header, the original default title is used.
+          final titleText = headerText.isNotEmpty
+              ? headerText
+              : 'WEEKLY SATSANG ATTENDANCE CHART - ${category.toUpperCase()}';
           return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.center,
             children: [
-              // Custom header line - always uppercase and centered.
-              if (headerText.isNotEmpty) ...[
-                pw.Container(
-                  width: double.infinity,
-                  alignment: pw.Alignment.center,
-                  child: pw.Text(
-                    headerText,
-                    textAlign: pw.TextAlign.center,
-                    style: pw.TextStyle(
-                        fontSize: 16, fontWeight: pw.FontWeight.bold),
-                  ),
+              pw.Container(
+                width: double.infinity,
+                alignment: pw.Alignment.center,
+                child: pw.Text(
+                  titleText,
+                  textAlign: pw.TextAlign.center,
+                  style:
+                      pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
                 ),
-                pw.SizedBox(height: 6),
-              ],
-              pw.Text(
-                'WEEKLY SATSANG ATTENDANCE CHART - ${category.toUpperCase()}',
-                style:
-                    pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
               ),
               pw.SizedBox(height: 3),
               pw.Text('IIT SURYA NAGAR - UNIT NO. 1740',
@@ -907,28 +989,25 @@ class ExportService {
       workbook.delete('Sheet1');
     }
 
-    // Custom header: first row, uppercase, merged across the 4 table
-    // columns (A-D) and centered.
+    // If a custom header has been set, it REPLACES the default title row
+    // entirely. With no custom header, the original default title is used.
     final headerText = (await loadHeader()).toUpperCase();
-    if (headerText.isNotEmpty) {
-      sheet.appendRow([xls.TextCellValue(headerText)]);
-      sheet.merge(
-        xls.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0),
-        xls.CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: 0),
-      );
-      sheet
-          .cell(xls.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0))
-          .cellStyle = xls.CellStyle(
-        bold: true,
-        fontSize: 14,
-        horizontalAlign: xls.HorizontalAlign.Center,
-      );
-    }
+    final titleText = headerText.isNotEmpty
+        ? headerText
+        : 'WEEKLY SATSANG ATTENDANCE CHART - ${category.toUpperCase()}';
 
-    sheet.appendRow([
-      xls.TextCellValue(
-          'WEEKLY SATSANG ATTENDANCE CHART - ${category.toUpperCase()}')
-    ]);
+    sheet.appendRow([xls.TextCellValue(titleText)]);
+    sheet.merge(
+      xls.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0),
+      xls.CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: 0),
+    );
+    sheet
+        .cell(xls.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0))
+        .cellStyle = xls.CellStyle(
+      bold: true,
+      fontSize: 14,
+      horizontalAlign: xls.HorizontalAlign.Center,
+    );
     sheet.appendRow([xls.TextCellValue('IIT SURYA NAGAR - UNIT NO. 1740')]);
     sheet.appendRow([
       xls.TextCellValue('DAY: $day'),

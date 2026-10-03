@@ -149,7 +149,7 @@ class _HomeScreenState extends State<HomeScreen> {
               padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
               child: Row(
                 children: [
-                  Icon(Icons.calendar_today,
+                  const Icon(Icons.calendar_today,
                       size: 16, color: AppTheme.headerBlue),
                   const SizedBox(width: 8),
                   Text('$_dayStr, $_dateStr',
@@ -165,7 +165,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         color: AppTheme.headerBlue.withOpacity(0.08),
                         borderRadius: BorderRadius.circular(20),
                       ),
-                      child: Text(
+                      child: const Text(
                         'Change Date',
                         style: TextStyle(
                           color: AppTheme.headerBlue,
