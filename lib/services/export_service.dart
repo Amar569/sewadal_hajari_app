@@ -12,6 +12,7 @@
 // import '../models/member.dart';
 // import '../models/attendance_record.dart';
 
+// /// One row combining a member with their attendance for the exported date.
 // class ExportRow {
 //   final Member member;
 //   final AttendanceRecord? record;
@@ -29,6 +30,7 @@
 //   }
 
 //   static String _fileSafeDate(String date) => date.replaceAll('/', '-');
+
 //   static Future<File> _headerFile() async {
 //     final base = await getApplicationDocumentsDirectory();
 //     return File('${base.path}/report_header.txt');
@@ -107,6 +109,13 @@
 //     );
 //     return doc.save();
 //   }
+
+//   /// Adds one category's chart (header + two-column table + signature
+//   /// block) as a page/pages onto an existing [doc]. Shared by the
+//   /// single-category export and the combined Gents+Ladies export.
+//   ///
+//   /// NOTE: this must NOT call doc.save() - the caller saves once, after
+//   /// all pages have been added.
 //   static void _addChartPage(
 //     pw.Document doc, {
 //     required String headerText,
@@ -158,36 +167,40 @@
 //         pageTheme: pw.PageTheme(
 //           pageFormat: PdfPageFormat.a4,
 //           margin: const pw.EdgeInsets.all(16),
+//           // Force an opaque white page background. Without this, the PDF
+//           // page is transparent, and when rasterized to PNG for sharing,
+//           // viewers that don't support transparency (e.g. WhatsApp) render
+//           // it as solid black - making all the black text invisible.
 //           buildBackground: (context) => pw.FullPage(
 //             ignoreMargins: true,
 //             child: pw.Container(color: PdfColors.white),
 //           ),
 //         ),
 //         header: (context) {
+//           // Only show the full title/subtitle/day-date block on the first
+//           // page. Without this check, MultiPage calls header() on every
+//           // page, so the title would print again at the top of page 2+.
 //           if (context.pageNumber > 1) {
 //             return pw.SizedBox(height: 6);
 //           }
+//           // If a custom header has been set, it REPLACES the default
+//           // "WEEKLY SATSANG ATTENDANCE CHART - CATEGORY" title entirely.
+//           // With no custom header, the original default title is used.
+//           final titleText = headerText.isNotEmpty
+//               ? headerText
+//               : 'WEEKLY SATSANG ATTENDANCE CHART - ${category.toUpperCase()}';
 //           return pw.Column(
 //             crossAxisAlignment: pw.CrossAxisAlignment.center,
 //             children: [
-//               // Custom header line - always uppercase and centered.
-//               if (headerText.isNotEmpty) ...[
-//                 pw.Container(
-//                   width: double.infinity,
-//                   alignment: pw.Alignment.center,
-//                   child: pw.Text(
-//                     headerText,
-//                     textAlign: pw.TextAlign.center,
-//                     style: pw.TextStyle(
-//                         fontSize: 16, fontWeight: pw.FontWeight.bold),
-//                   ),
+//               pw.Container(
+//                 width: double.infinity,
+//                 alignment: pw.Alignment.center,
+//                 child: pw.Text(
+//                   titleText,
+//                   textAlign: pw.TextAlign.center,
+//                   style:
+//                       pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
 //                 ),
-//                 pw.SizedBox(height: 6),
-//               ],
-//               pw.Text(
-//                 'WEEKLY SATSANG ATTENDANCE CHART - ${category.toUpperCase()}',
-//                 style:
-//                     pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
 //               ),
 //               pw.SizedBox(height: 3),
 //               pw.Text('IIT SURYA NAGAR - UNIT NO. 1740',
@@ -443,28 +456,25 @@
 //       workbook.delete('Sheet1');
 //     }
 
-//     // Custom header: first row, uppercase, merged across the 4 table
-//     // columns (A-D) and centered.
+//     // If a custom header has been set, it REPLACES the default title row
+//     // entirely. With no custom header, the original default title is used.
 //     final headerText = (await loadHeader()).toUpperCase();
-//     if (headerText.isNotEmpty) {
-//       sheet.appendRow([xls.TextCellValue(headerText)]);
-//       sheet.merge(
-//         xls.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0),
-//         xls.CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: 0),
-//       );
-//       sheet
-//           .cell(xls.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0))
-//           .cellStyle = xls.CellStyle(
-//         bold: true,
-//         fontSize: 14,
-//         horizontalAlign: xls.HorizontalAlign.Center,
-//       );
-//     }
+//     final titleText = headerText.isNotEmpty
+//         ? headerText
+//         : 'WEEKLY SATSANG ATTENDANCE CHART - ${category.toUpperCase()}';
 
-//     sheet.appendRow([
-//       xls.TextCellValue(
-//           'WEEKLY SATSANG ATTENDANCE CHART - ${category.toUpperCase()}')
-//     ]);
+//     sheet.appendRow([xls.TextCellValue(titleText)]);
+//     sheet.merge(
+//       xls.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0),
+//       xls.CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: 0),
+//     );
+//     sheet
+//         .cell(xls.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0))
+//         .cellStyle = xls.CellStyle(
+//       bold: true,
+//       fontSize: 14,
+//       horizontalAlign: xls.HorizontalAlign.Center,
+//     );
 //     sheet.appendRow([xls.TextCellValue('IIT SURYA NAGAR - UNIT NO. 1740')]);
 //     sheet.appendRow([
 //       xls.TextCellValue('DAY: $day'),
@@ -518,6 +528,7 @@
 //   }
 // }
 
+
 import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
@@ -551,17 +562,26 @@ class ExportService {
 
   static String _fileSafeDate(String date) => date.replaceAll('/', '-');
 
+  /// Date + time stamp (e.g. 2026-10-26_1102) so every export gets a NEW
+  /// file name. Re-using one name let Android/gallery/WhatsApp show an
+  /// old cached copy of the file instead of the fresh export.
+  static String _stamp(String date) {
+    final n = DateTime.now();
+    String two(int v) => v.toString().padLeft(2, '0');
+    return '${_fileSafeDate(date)}_${two(n.hour)}${two(n.minute)}${two(n.second)}';
+  }
+
   // ------------------------------------------------------------------
-  // Custom report header (printed above "WEEKLY SATSANG ATTENDANCE CHART"
-  // in every PDF, PNG and Excel file). Stored in a small text file so it
-  // survives app restarts. Empty text = no header line.
+  // Custom report header. When set, it REPLACES the default
+  // "WEEKLY SATSANG ATTENDANCE CHART - CATEGORY" title in every PDF,
+  // PNG and Excel file. Stored in a small text file so it survives
+  // app restarts. Empty text = default title is used.
   // ------------------------------------------------------------------
   static Future<File> _headerFile() async {
     final base = await getApplicationDocumentsDirectory();
     return File('${base.path}/report_header.txt');
   }
 
-  /// Returns the saved header exactly as stored ('' if none).
   static Future<String> loadHeader() async {
     try {
       final f = await _headerFile();
@@ -576,6 +596,11 @@ class ExportService {
     final f = await _headerFile();
     await f.writeAsString(text.trim());
   }
+
+  /// A member counts as present when a PV/PC time has been entered.
+  static int _presentCount(List<ExportRow> rows) => rows
+      .where((r) => (r.record?.pvTime ?? '').trim().isNotEmpty)
+      .length;
 
   // ------------------------------------------------------------------
   // Shared PDF document builder - used by both exportPdf and exportPng,
@@ -605,8 +630,8 @@ class ExportService {
   }
 
   // ------------------------------------------------------------------
-  // Combined PDF - Gents and Ladies added as consecutive pages of the
-  // SAME document/file, instead of two separate files.
+  // Combined PDF - Gents and Ladies as consecutive pages of ONE document.
+  // (Not connected to a button yet.)
   // ------------------------------------------------------------------
   static Future<Uint8List> _buildCombinedPdfBytes({
     required String day,
@@ -643,12 +668,9 @@ class ExportService {
     return doc.save();
   }
 
-  /// Adds one category's chart (header + two-column table + signature
-  /// block) as a page/pages onto an existing [doc]. Shared by the
-  /// single-category export and the combined Gents+Ladies export.
-  ///
-  /// NOTE: this must NOT call doc.save() - the caller saves once, after
-  /// all pages have been added.
+  /// Adds one category's chart (title + two-column table + present count
+  /// + signature block) onto an existing [doc]. Must NOT call doc.save();
+  /// the caller saves once after all pages are added.
   static void _addChartPage(
     pw.Document doc, {
     required String headerText,
@@ -665,6 +687,8 @@ class ExportService {
     final rightRows = rows.sublist(splitIndex);
     final maxLen =
         leftRows.length > rightRows.length ? leftRows.length : rightRows.length;
+
+    final presentCount = _presentCount(rows);
 
     List<String> rowData(ExportRow? r) {
       if (r == null) return ['', '', '', ''];
@@ -700,25 +724,20 @@ class ExportService {
         pageTheme: pw.PageTheme(
           pageFormat: PdfPageFormat.a4,
           margin: const pw.EdgeInsets.all(16),
-          // Force an opaque white page background. Without this, the PDF
-          // page is transparent, and when rasterized to PNG for sharing,
-          // viewers that don't support transparency (e.g. WhatsApp) render
-          // it as solid black - making all the black text invisible.
+          // Opaque white page background so the PNG isn't transparent
+          // (viewers show transparency as black, hiding the black text).
           buildBackground: (context) => pw.FullPage(
             ignoreMargins: true,
             child: pw.Container(color: PdfColors.white),
           ),
         ),
         header: (context) {
-          // Only show the full title/subtitle/day-date block on the first
-          // page. Without this check, MultiPage calls header() on every
-          // page, so the title would print again at the top of page 2+.
+          // Full title block only on the first page of each chart.
           if (context.pageNumber > 1) {
             return pw.SizedBox(height: 6);
           }
-          // If a custom header has been set, it REPLACES the default
-          // "WEEKLY SATSANG ATTENDANCE CHART - CATEGORY" title entirely.
-          // With no custom header, the original default title is used.
+          // A custom header REPLACES the default title; with no custom
+          // header the original default title is used.
           final titleText = headerText.isNotEmpty
               ? headerText
               : 'WEEKLY SATSANG ATTENDANCE CHART - ${category.toUpperCase()}';
@@ -731,8 +750,8 @@ class ExportService {
                 child: pw.Text(
                   titleText,
                   textAlign: pw.TextAlign.center,
-                  style:
-                      pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
+                  style: pw.TextStyle(
+                      fontSize: 16, fontWeight: pw.FontWeight.bold),
                 ),
               ),
               pw.SizedBox(height: 3),
@@ -751,11 +770,8 @@ class ExportService {
             ],
           );
         },
-        // NOTE: no `footer:` here on purpose. MultiPage's footer is pinned
-        // to the bottom of every page, which left a large empty gap between
-        // the table and the signature block whenever the table didn't fill
-        // the page. Instead, the signature block is now the last item in
-        // `build:` below, so it sits immediately after the table content.
+        // No `footer:` on purpose: MultiPage pins it to the page bottom,
+        // leaving a big gap. Present count + signatures follow the table.
         build: (context) => [
           pw.TableHelper.fromTextArray(
             headers: headers,
@@ -781,7 +797,13 @@ class ExportService {
               7: const pw.FlexColumnWidth(0.85),
             },
           ),
-          pw.SizedBox(height: 24),
+          pw.SizedBox(height: 10),
+          // Present count, directly below the table.
+          pw.Text(
+            'TOTAL PRESENT: $presentCount',
+            style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
+          ),
+          pw.SizedBox(height: 20),
           pw.Row(
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             children: [
@@ -835,20 +857,15 @@ class ExportService {
     );
 
     final dir = await exportsDir();
-    final fileName = 'Hajari_${category}_${_fileSafeDate(date)}.pdf';
+    final fileName = 'Hajari_${category}_${_stamp(date)}.pdf';
     final file = File('${dir.path}/$fileName');
     await file.writeAsBytes(pdfBytes);
     return file;
   }
 
   // ------------------------------------------------------------------
-  // PNG export - rasterizes the PDF into a shareable image.
-  //
-  // IMPORTANT: with a large member list, the PDF can span more than one
-  // page. If we only rasterized the first page, everyone after the page
-  // break would silently disappear from the shared image. So instead we
-  // rasterize every page and stitch them vertically into one tall PNG -
-  // nothing is ever lost, regardless of how many members there are.
+  // PNG export - rasterizes every PDF page and stitches them into one
+  // image, trimming blank space under the last page.
   // ------------------------------------------------------------------
   static Future<File> exportPng({
     required String category,
@@ -867,26 +884,22 @@ class ExportService {
       shikshakName: shikshakName,
     );
 
-    // Rasterize at a high DPI so the exported chart stays sharp/readable.
     final rasterPages = await Printing.raster(pdfBytes, dpi: 220).toList();
     final pngBytes = await _composePng(rasterPages);
 
     final dir = await exportsDir();
-    final fileName = 'Hajari_${category}_${_fileSafeDate(date)}.png';
+    final fileName = 'Hajari_${category}_${_stamp(date)}.png';
     final file = File('${dir.path}/$fileName');
     await file.writeAsBytes(pngBytes);
     return file;
   }
 
-  /// Scans a rasterized page from the bottom up and returns the y-coordinate
-  /// of the lowest non-white pixel row (i.e. where real content ends).
-  /// Used to crop away the blank space left below the content on a fixed
-  /// A4-height page.
+  /// Returns the y of the lowest non-white pixel row (where content ends).
   static int _findContentBottom(PdfRaster raster) {
     final pixels = raster.pixels; // raw RGBA bytes
     final width = raster.width;
     final height = raster.height;
-    const whiteThreshold = 250; // treat near-white as blank
+    const whiteThreshold = 250;
 
     for (int y = height - 1; y >= 0; y--) {
       final rowStart = y * width * 4;
@@ -902,11 +915,6 @@ class ExportService {
     return height - 1;
   }
 
-  /// Decodes each rasterized PDF page into a ui.Image, trims the blank
-  /// space below the content on the last page (where the fixed A4 page
-  /// height otherwise leaves a large empty gap under the signature row),
-  /// and draws every page's content onto one composite canvas - stacked
-  /// vertically if there's more than one page.
   static Future<Uint8List> _composePng(List<PdfRaster> rasterPages) async {
     Future<ui.Image> decode(PdfRaster raster) {
       final completer = Completer<ui.Image>();
@@ -925,10 +933,7 @@ class ExportService {
       images.add(await decode(raster));
     }
 
-    // Only the LAST page needs bottom-trimming - earlier pages (if the
-    // list spans multiple pages) are filled with table rows and don't
-    // have trailing blank space.
-    const bottomPadding = 24; // small breathing room below the content
+    const bottomPadding = 24;
     final lastRaster = rasterPages.last;
     final contentBottom = _findContentBottom(lastRaster);
     final trimmedLastHeight =
@@ -989,8 +994,7 @@ class ExportService {
       workbook.delete('Sheet1');
     }
 
-    // If a custom header has been set, it REPLACES the default title row
-    // entirely. With no custom header, the original default title is used.
+    // A custom header REPLACES the default title row.
     final headerText = (await loadHeader()).toUpperCase();
     final titleText = headerText.isNotEmpty
         ? headerText
@@ -1008,6 +1012,7 @@ class ExportService {
       fontSize: 14,
       horizontalAlign: xls.HorizontalAlign.Center,
     );
+
     sheet.appendRow([xls.TextCellValue('IIT SURYA NAGAR - UNIT NO. 1740')]);
     sheet.appendRow([
       xls.TextCellValue('DAY: $day'),
@@ -1033,7 +1038,7 @@ class ExportService {
     }
 
     final dir = await exportsDir();
-    final fileName = 'Hajari_${category}_${_fileSafeDate(date)}.xlsx';
+    final fileName = 'Hajari_${category}_${_stamp(date)}.xlsx';
     final file = File('${dir.path}/$fileName');
     final bytes = workbook.encode();
     await file.writeAsBytes(bytes!);
